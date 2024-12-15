@@ -30,6 +30,8 @@ services:
 
   fastapi:
     build: .
+    env_file:
+      - .env
     volumes:
       - ./:/myapp/
     depends_on:
