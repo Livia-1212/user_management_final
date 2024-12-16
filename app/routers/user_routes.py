@@ -21,10 +21,12 @@ Key Highlights:
 from builtins import dict, int, len, str
 from datetime import timedelta
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Response, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.dependencies import get_current_user, get_db, get_email_service, require_role
+from sqlalchemy.future import select
+from app.dependencies import get_current_user, get_db, get_email_service, require_role, get_settings
+from app.models.user_model import User, UserRole
 from app.schemas.pagination_schema import EnhancedPagination
 from app.schemas.token_schema import TokenResponse
 from app.schemas.user_schemas import LoginRequest, UserBase, UserCreate, UserListResponse, UserResponse, UserUpdate
@@ -33,6 +35,7 @@ from app.services.jwt_service import create_access_token
 from app.utils.link_generation import create_user_links, generate_pagination_links
 from app.dependencies import get_settings
 from app.services.email_service import EmailService
+
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 settings = get_settings()
@@ -245,3 +248,84 @@ async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get
     if await UserService.verify_email_with_token(db, user_id, token):
         return {"message": "Email verified successfully"}
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token")
+
+from datetime import datetime
+from sqlalchemy.sql import func
+from fastapi import Request
+
+@router.get("/users/search", response_model=UserListResponse, name="search_users", tags=["User Management Requires (Admin or Manager Roles)"])
+async def search_users(
+    request: Request,  # Added `request` parameter
+    db: AsyncSession = Depends(get_db),
+    nickname: str | None = Query(None, description="Search by nickname"),
+    email: str | None = Query(None, description="Search by email"),
+    role: UserRole | None = Query(None, description="Filter by role"),
+    is_locked: bool | None = Query(None, description="Filter by account locked status"),
+    is_converted: bool | None = Query(None, description="Filter by conversion status"),
+    start_date: str | None = Query(None, description="Filter by registration start date (YYYY-MM-DD)"),
+    end_date: str | None = Query(None, description="Filter by registration end date (YYYY-MM-DD)"),
+    skip: int = Query(0, description="Number of records to skip for pagination"),
+    limit: int = Query(10, description="Number of records to return for pagination"),
+    current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))
+):
+    """
+    Search and filter users based on criteria.
+
+    Parameters:
+        - **nickname**: Partial match for nickname.
+        - **email**: Partial match for email.
+        - **role**: Filter by user role.
+        - **is_locked**: Filter by account locked status.
+        - **is_converted**: Filter by conversion status.
+        - **start_date**: Filter by registration start date.
+        - **end_date**: Filter by registration end date.
+        - **skip**: Pagination - number of records to skip.
+        - **limit**: Pagination - number of records to return.
+    """
+    try:
+        # Validate date inputs
+        if start_date:
+            start_date = datetime.strptime(start_date, "%Y-%m-%d")
+        if end_date:
+            end_date = datetime.strptime(end_date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+    query = select(User)
+
+    # Apply filters based on query parameters
+    if nickname:
+        query = query.where(User.nickname.ilike(f"%{nickname}%"))
+    if email:
+        query = query.where(User.email.ilike(f"%{email}%"))
+    if role:
+        query = query.where(User.role == role)
+    if is_locked is not None:
+        query = query.where(User.is_locked == is_locked)
+    if is_converted is not None:
+        query = query.where(User.is_converted == is_converted)
+    if start_date:
+        query = query.where(User.created_at >= start_date)
+    if end_date:
+        query = query.where(User.created_at <= end_date)
+
+    # Apply pagination
+    query = query.offset(skip).limit(limit)
+
+    # Execute the query
+    result = await db.execute(query)
+    users = result.scalars().all()
+
+    # Count total users for pagination
+    total_query = select(func.count()).select_from(User)
+    total_result = await db.execute(total_query)
+    total_users = total_result.scalar()
+
+    # Construct response
+    return UserListResponse(
+        total=total_users,
+        items=[UserResponse.model_validate(user) for user in users],
+        page=skip // limit + 1,
+        size=len(users),
+        links=generate_pagination_links(request, skip, limit, total_users)
+    )
