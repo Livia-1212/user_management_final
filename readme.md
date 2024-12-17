@@ -9,6 +9,11 @@
     Word Document Reflection: 
         [Document-Reflection]()
 
+    >>> What I have learnt:
+       how SQLAlchemy’s execute and scalars interact when mocked. When we mock these methods using AsyncMock or MagicMock, the scalars() method can behave like a coroutine if not mocked correctly, leading to confusion in the test environment.
+
+       
+
     QA-Issue & Debugging Branch:
         [5-QA-issues](https://github.com/Livia-1212/user_management_final/tree/1-Bug)
 

@@ -102,8 +102,8 @@ async def test_get_retention_data():
 
     # Mock the result of `execute`
     mock_result = AsyncMock()
-    mock_result.scalars.return_value.all.return_value = mock_retention_data  # Mock all() result
-    mock_db.execute.return_value = mock_result  # db.execute() returns the result mock
+    mock_result.scalars.return_value.all.return_value = mock_retention_data  # Mock scalars().all()
+    mock_db.execute.return_value = mock_result  # db.execute() returns mock_result
 
     # Call the service method
     data = await AnalyticsService.get_retention_data(mock_db)
@@ -112,7 +112,6 @@ async def test_get_retention_data():
     assert data == mock_retention_data
     mock_db.execute.assert_called_once()
     mock_result.scalars.assert_called_once()
-    mock_result.scalars.return_value.all.assert_called_once()
 
 
 

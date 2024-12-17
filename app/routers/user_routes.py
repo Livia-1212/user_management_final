@@ -266,15 +266,15 @@ async def search_users(
     request: Request,  # Added `request` parameter
     db: AsyncSession = Depends(get_db),
     nickname: str | None = Query(None, description="Search by nickname"),
-    email: str | None = Query(None, description="Search by email"),
-    role: UserRole | None = Query(None, description="Filter by role"),
-    is_locked: bool | None = Query(None, description="Filter by account locked status"),
-    is_converted: bool | None = Query(None, description="Filter by conversion status"),
-    start_date: str | None = Query(None, description="Filter by registration start date (YYYY-MM-DD)"),
-    end_date: str | None = Query(None, description="Filter by registration end date (YYYY-MM-DD)"),
-    skip: int = Query(0, description="Number of records to skip for pagination"),
-    limit: int = Query(10, description="Number of records to return for pagination"),
-    current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))
+    # email: str | None = Query(None, description="Search by email"),
+    # role: UserRole | None = Query(None, description="Filter by role"),
+    # is_locked: bool | None = Query(None, description="Filter by account locked status"),
+    # is_converted: bool | None = Query(None, description="Filter by conversion status"),
+    # start_date: str | None = Query(None, description="Filter by registration start date (YYYY-MM-DD)"),
+    # end_date: str | None = Query(None, description="Filter by registration end date (YYYY-MM-DD)"),
+    # skip: int = Query(0, description="Number of records to skip for pagination"),
+    # limit: int = Query(10, description="Number of records to return for pagination"),
+    # current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))
 ):
     """
     Search and filter users based on criteria.
@@ -289,33 +289,34 @@ async def search_users(
         - **end_date**: Filter by registration end date.
         - **skip**: Pagination - number of records to skip.
         - **limit**: Pagination - number of records to return.
-    """
-    try:
-        # Validate date inputs
-        if start_date:
-            start_date = datetime.strptime(start_date, "%Y-%m-%d")
-        if end_date:
-            end_date = datetime.strptime(end_date, "%Y-%m-%d")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+    # """
+    # try:
+    #     # Validate date inputs
+    #     if start_date:
+    #         start_date = datetime.strptime(start_date, "%Y-%m-%d")
+    #     if end_date:
+    #         end_date = datetime.strptime(end_date, "%Y-%m-%d")
+    # except ValueError:
+    #     raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
+    print("test")
     query = select(User)
 
     # Apply filters based on query parameters
     if nickname:
         query = query.where(User.nickname.ilike(f"%{nickname}%"))
-    if email:
-        query = query.where(User.email.ilike(f"%{email}%"))
-    if role:
-        query = query.where(User.role == role)
-    if is_locked is not None:
-        query = query.where(User.is_locked == is_locked)
-    if is_converted is not None:
-        query = query.where(User.is_converted == is_converted)
-    if start_date:
-        query = query.where(User.created_at >= start_date)
-    if end_date:
-        query = query.where(User.created_at <= end_date)
+    # if email:
+    #     query = query.where(User.email.ilike(f"%{email}%"))
+    # if role:
+    #     query = query.where(User.role == role)
+    # if is_locked is not None:
+    #     query = query.where(User.is_locked == is_locked)
+    # if is_converted is not None:
+    #     query = query.where(User.is_converted == is_converted)
+    # if start_date:
+    #     query = query.where(User.created_at >= start_date)
+    # if end_date:
+    #     query = query.where(User.created_at <= end_date)
 
     # Apply pagination
     query = query.offset(skip).limit(limit)

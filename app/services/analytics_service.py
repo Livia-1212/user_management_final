@@ -60,12 +60,15 @@ class AnalyticsService:
         db.add(analytics)
         await db.commit()
 
+
     @staticmethod
     async def get_retention_data(db: AsyncSession):
         """Retrieve the most recent retention analytics data."""
         result = await db.execute(
             RetentionAnalytics.__table__.select().order_by(RetentionAnalytics.timestamp.desc())
         )
-        # Resolve the result to scalars and fetch all rows
-        analytics_data = await result.scalars().all()
+        analytics_data = result.scalars().all()  # Correct: no 'await' here
         return analytics_data
+
+
+
