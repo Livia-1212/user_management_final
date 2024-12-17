@@ -1,7 +1,7 @@
 import sys
 print(sys.path)
 import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 from uuid import uuid4
 

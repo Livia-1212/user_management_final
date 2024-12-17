@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql import func
-from datetime import datetime, timezone
+from sqlalchemy.sql import func, select
+from datetime import datetime, timezone, timedelta
 from app.models.user_model import User, RetentionAnalytics
 from uuid import UUID
 
@@ -20,11 +20,11 @@ class AnalyticsService:
     @staticmethod
     async def calculate_retention_metrics(db: AsyncSession):
         """Calculate retention metrics and save them into the database."""
-        now = datetime.now(tz=datetime.timezone.utc)
+        now = datetime.now(timezone.utc)
 
-        # Calculate user counts
-        total_anonymous = await db.scalar(func.count(User.id).where(User.role == "ANONYMOUS"))
-        total_authenticated = await db.scalar(func.count(User.id).where(User.role == "AUTHENTICATED"))
+        # Count total anonymous and authenticated users using select()
+        total_anonymous = await db.scalar(select(func.count()).where(User.role == "ANONYMOUS"))
+        total_authenticated = await db.scalar(select(func.count()).where(User.role == "AUTHENTICATED"))
 
         # Calculate conversion rate
         conversion_rate = (
@@ -33,24 +33,16 @@ class AnalyticsService:
             else "0%"
         )
 
-        # Calculate inactive users
-        inactive_24hr = await db.scalar(func.count(User.id).where(User.last_login_at < now - timedelta(hours=24)))
-        inactive_48hr = await db.scalar(func.count(User.id).where(User.last_login_at < now - timedelta(hours=48)))
-        inactive_1wk = await db.scalar(func.count(User.id).where(User.last_login_at < now - timedelta(weeks=1)))
-        inactive_1yr = await db.scalar(func.count(User.id).where(User.last_login_at < now - timedelta(days=365)))
-
-        # Save metrics into RetentionAnalytics
+        # Save the metrics to RetentionAnalytics
         analytics = RetentionAnalytics(
             total_anonymous_users=total_anonymous,
             total_authenticated_users=total_authenticated,
             conversion_rate=conversion_rate,
-            inactive_users_24hr=inactive_24hr,
-            inactive_users_48hr=inactive_48hr,
-            inactive_users_1wk=inactive_1wk,
-            inactive_users_1yr=inactive_1yr,
+            timestamp=now,
         )
         db.add(analytics)
         await db.commit()
+
 
     @staticmethod
     async def get_retention_data(db: AsyncSession):

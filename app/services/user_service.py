@@ -12,6 +12,7 @@ from app.schemas.user_schemas import UserCreate, UserUpdate
 from app.utils.nickname_gen import generate_nickname
 from app.utils.security import generate_verification_token, hash_password, verify_password
 from uuid import UUID
+from pydantic import ValidationError
 from app.services.email_service import EmailService
 import logging
 
@@ -91,52 +92,63 @@ class UserService:
             return None
 
     @classmethod
-    async def update(cls, session: AsyncSession, user_id: UUID, update_data: Dict[str, str], current_user: User) -> Optional[User]:
+    async def update(cls, session: AsyncSession, user_id: UUID, update_data: Dict[str, Optional[str]], current_user: dict) -> Optional[User]:
         """
         Updates user data, allowing role changes only by ADMIN users.
 
         Args:
             session: Database session.
             user_id: ID of the user to be updated.
-            update_data: Data for the update.
+            update_data: Data for the update (None values are ignored).
             current_user: User performing the update (must have ADMIN role for role changes).
 
         Returns:
             Updated user object or None if update fails.
         """
         try:
-            # Validate incoming data
-            validated_data = UserUpdate(**update_data).model_dump(exclude_unset=True)
+            # Step 1: Clean update_data by removing None values
+            cleaned_data = {key: value for key, value in update_data.items() if value is not None}
+            if not cleaned_data:
+                logger.error("No valid fields provided for update.")
+                return None
 
-            # Only ADMIN users can change roles
-            if "role" in validated_data and current_user.role != UserRole.ADMIN:
-                logger.warning("Unauthorized role update attempt.")
-                raise Exception("Only ADMIN users can update roles.")
+            # Step 2: Validate the cleaned data
+            try:
+                validated_data = UserUpdate(**cleaned_data).model_dump(exclude_unset=True)
+            except ValidationError as e:
+                logger.error(f"Validation error: {e}")
+                return None
 
-            # Hash new password if provided
-            if "password" in validated_data:
-                validated_data["hashed_password"] = hash_password(validated_data.pop("password"))
+            logger.info(f"Updating user {user_id} with data: {validated_data}")
 
-            # Update user data
+            # Step 3: Check role change permissions
+            if 'role' in validated_data and current_user.get('role') != UserRole.ADMIN.name:
+                logger.error("Unauthorized role update attempt.")
+                return None
+
+            # Step 4: Perform the update
             query = (
                 update(User)
                 .where(User.id == user_id)
                 .values(**validated_data)
                 .execution_options(synchronize_session="fetch")
             )
-            await cls._execute_query(session, query)
+            result = await session.execute(query)
+            await session.commit()
 
-            # Refresh and return updated user
-            updated_user = await cls.get_by_id(session, user_id)
-            if updated_user:
-                session.refresh(updated_user)
-                logger.info(f"User {user_id} updated successfully by {current_user.email}.")
-                return updated_user
-            else:
-                logger.error(f"User {user_id} not found after update attempt.")
+            # Step 5: Fetch and return the updated user
+            if result.rowcount > 0:  # Ensure a row was updated
+                updated_user = await cls.get_by_id(session, user_id)
+                if updated_user:
+                    session.refresh(updated_user)  # Ensure updated data
+                    return updated_user
+
+            logger.error(f"User {user_id} not found or update failed.")
             return None
+
         except Exception as e:
             logger.error(f"Error during user update: {e}")
+            await session.rollback()
             return None
 
 

@@ -6,6 +6,7 @@ from app.models.user_model import User, UserRole
 from app.utils.nickname_gen import generate_nickname
 from app.utils.security import hash_password
 from app.services.jwt_service import decode_token  # Import your FastAPI app
+from app.services.user_service import UserService
 
 # Example of a test function using the async_client fixture
 @pytest.mark.asyncio
@@ -190,3 +191,21 @@ async def test_list_users_unauthorized(async_client, user_token):
         headers={"Authorization": f"Bearer {user_token}"}
     )
     assert response.status_code == 403  # Forbidden, as expected for regular user
+
+    # Test updating a user with invalid data
+@pytest.mark.asyncio
+async def test_update_user_valid_data(db_session, user):
+    # Confirm the user exists before updating
+    existing_user = await UserService.get_by_id(db_session, user.id)
+    assert existing_user is not None, "Test user does not exist in database."
+
+    new_email = "valid_email@example.com"
+    current_user = {"role": UserRole.ADMIN.name}  # Ensure correct role
+
+    # Perform the update
+    updated_user = await UserService.update(db_session, user.id, {"email": new_email}, current_user=current_user)
+
+    # Verify the user is updated
+    assert updated_user is not None, "The update method returned None."
+    assert updated_user.email == new_email, f"Expected email {new_email}, got {updated_user.email}"
+
