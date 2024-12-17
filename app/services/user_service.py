@@ -7,13 +7,12 @@ from sqlalchemy import func, null, update, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies import get_email_service, get_settings
-from app.models.user_model import User
+from app.models.user_model import User, UserRole
 from app.schemas.user_schemas import UserCreate, UserUpdate
 from app.utils.nickname_gen import generate_nickname
 from app.utils.security import generate_verification_token, hash_password, verify_password
 from uuid import UUID
 from app.services.email_service import EmailService
-from app.models.user_model import UserRole
 import logging
 
 settings = get_settings()
@@ -57,50 +56,89 @@ class UserService:
             if existing_user:
                 logger.error("User with given email already exists.")
                 return None
+            
+            # Hash the password
             validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
+            
+            # Create user object
             new_user = User(**validated_data)
+
+            # Generate a unique nickname
             new_nickname = generate_nickname()
             while await cls.get_by_nickname(session, new_nickname):
                 new_nickname = generate_nickname()
             new_user.nickname = new_nickname
-            logger.info(f"User Role: {new_user.role}")
+
+            # Assign role: First user as ADMIN, others as ANONYMOUS
             user_count = await cls.count(session)
-            new_user.role = UserRole.ADMIN if user_count == 0 else UserRole.ANONYMOUS            
+            new_user.role = UserRole.ADMIN if user_count == 0 else UserRole.ANONYMOUS
             if new_user.role == UserRole.ADMIN:
                 new_user.email_verified = True
 
-            
+            # Generate verification token
             new_user.verification_token = generate_verification_token()
 
+            # Save to DB
             session.add(new_user)
             await session.commit()
+
+            # Send verification email
             await email_service.send_verification_email(new_user)
+
             return new_user
         except ValidationError as e:
             logger.error(f"Validation error during user creation: {e}")
             return None
 
     @classmethod
-    async def update(cls, session: AsyncSession, user_id: UUID, update_data: Dict[str, str]) -> Optional[User]:
+    async def update(cls, session: AsyncSession, user_id: UUID, update_data: Dict[str, str], current_user: User) -> Optional[User]:
+        """
+        Updates user data, allowing role changes only by ADMIN users.
+
+        Args:
+            session: Database session.
+            user_id: ID of the user to be updated.
+            update_data: Data for the update.
+            current_user: User performing the update (must have ADMIN role for role changes).
+
+        Returns:
+            Updated user object or None if update fails.
+        """
         try:
-            # validated_data = UserUpdate(**update_data).dict(exclude_unset=True)
+            # Validate incoming data
             validated_data = UserUpdate(**update_data).model_dump(exclude_unset=True)
 
-            if 'password' in validated_data:
-                validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
-            query = update(User).where(User.id == user_id).values(**validated_data).execution_options(synchronize_session="fetch")
+            # Only ADMIN users can change roles
+            if "role" in validated_data and current_user.role != UserRole.ADMIN:
+                logger.warning("Unauthorized role update attempt.")
+                raise Exception("Only ADMIN users can update roles.")
+
+            # Hash new password if provided
+            if "password" in validated_data:
+                validated_data["hashed_password"] = hash_password(validated_data.pop("password"))
+
+            # Update user data
+            query = (
+                update(User)
+                .where(User.id == user_id)
+                .values(**validated_data)
+                .execution_options(synchronize_session="fetch")
+            )
             await cls._execute_query(session, query)
+
+            # Refresh and return updated user
             updated_user = await cls.get_by_id(session, user_id)
             if updated_user:
-                session.refresh(updated_user)  # Explicitly refresh the updated user object
-                logger.info(f"User {user_id} updated successfully.")
+                session.refresh(updated_user)
+                logger.info(f"User {user_id} updated successfully by {current_user.email}.")
                 return updated_user
             else:
                 logger.error(f"User {user_id} not found after update attempt.")
             return None
-        except Exception as e:  # Broad exception handling for debugging
+        except Exception as e:
             logger.error(f"Error during user update: {e}")
             return None
+
 
     @classmethod
     async def delete(cls, session: AsyncSession, user_id: UUID) -> bool:

@@ -1,4 +1,5 @@
-# New-Feature Built:  🔍 User Search and Filtering
+# This is the Feature requirement
+## New-Feature Built:  🔍 User Search and Filtering
 
 - **Feature Description:** Implement search and filtering capabilities to allow administrators to easily find and manage users based on various criteria.
 - **User Story:** As an administrator, I want to be able to search for users based on their username, email, role, or other relevant attributes and filter the user list accordingly.
@@ -19,6 +20,7 @@
 
 
 # Key Feature Mini Milestones
+
 **The User Search and Filtering feature requires:**
 - Search functionality:
     - Ability to search for users by nickname, email, or role.
@@ -26,14 +28,31 @@
     - Filter users based on account status (is_locked, email_verified).
     - Filter users by registration date range (created_at).
 - API endpoints:
-    - Added /users/search new endpoint to router, implement the code to enable the query parameters to accept a variety of search and filter options to give administrators flexibility. 
+    - Added `/users/search` new endpoint to router, implementing the code to enable the query parameters to accept a variety of search and filter options to give administrators flexibility. 
 
 ## Step 1: Review Existing User Management Code and API Endpoints
-- Added invited_by_user_id and is_converted columns to app/models/user_model.py to facilitate the new functionalities, the invited_by_user_id will track which user invited a specific user, useful for analytics and filtering by user relationships; the is_converted tracks whether an anonymous user has been converted to an authenticated user. 
-- Added a retention_analytics table to enable tracking user retention
+- Added `invited_by_user_id` and `is_converted` columns to `app/models/user_model.py` to facilitate the new functionalities. 
+    - `invited_by_user_id`: Tracks which user invited a specific user, useful for analytics and filtering by user relationships.  
+    - `is_converted`: Tracks whether an anonymous user has been converted to an authenticated user. 
+- Added a `retention_analytics` table to enable tracking user retention.
 
-## Step 2: API-level Enhancement to Search and Filtering features:
-- Update the user management API endpoints in app/routers/user_routes.py to:
-    - Accept query parameters for search (nickname, email, role) and filtering (is_locked, email_verified, created_at range).
-    - Query the database using these parameters.
-- Add pagination and sorting capabilities to the results for better usability.
+## Step 2: Implement Analytics Logic and Add API-level Enhancement to Search and Filtering Features
+- Updated the user management API endpoints in `app/routers/user_routes.py` to:
+    - Accept query parameters for search (`nickname`, `email`, `role`) and filtering (`is_locked`, `email_verified`, `created_at` range).
+    - Query the database dynamically based on these parameters.
+- Added **pagination and sorting capabilities** to enhance usability and performance for administrators when searching or filtering user data.
+- **Enhanced role-based access control (RBAC):**
+    - Only ADMIN users can modify the role of other users. 
+    - Implemented changes in the `UserService.update` method to enforce RBAC, logging and denying unauthorized role changes.
+- **Logging Improvements:** Unauthorized attempts to update roles or sensitive user data are now logged for security auditing.
+
+## Step 3: Unit Testing and Quality Assurance
+- Added unit tests to verify:
+    - Search and filter functionalities for various query parameters (`nickname`, `email`, `role`, date ranges).
+    - Pagination and sorting for large datasets.
+    - RBAC enforcement when attempting to update roles (ADMIN-only access).
+    - Edge cases such as invalid query parameters and empty datasets.
+
+## Step 4: Include Tasks for User Invitations
+
+## Step 5: Visualize Analytics
