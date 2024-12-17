@@ -6,17 +6,25 @@
 
 1. **Reflection Document**: 
 
-[Document-Reflection]()
+    Word Document Reflection: 
+        [Document-Reflection]()
 
-[5-QA-issues](https://github.com/Livia-1212/user_management_final/tree/1-Bug)
+    QA-Issue & Debugging:
+        [5-QA-issues](https://github.com/Livia-1212/user_management_final/tree/1-Bug)
 
-[10-NEW-tests](https://github.com/Livia-1212/user_management_final/blob/new-features/tests/test_services/test_analytics_service.py) 
+    New Unit Testing:
+        [10-NEW-tests](https://github.com/Livia-1212/user_management_final/blob/new-features/tests/test_services/test_analytics_service.py) 
 
-[NewFeature-Branch](https://github.com/Livia-1212/user_management_final/tree/new-features)
+    New Feature Added Branch:
+        [NewFeature-Branch](https://github.com/Livia-1212/user_management_final/tree/new-features)
 
-[NewFeature-Documentation](https://github.com/Livia-1212/user_management_final/blob/new-features/new_features.md)
+    [New-feature-documentation] (https://github.com/Livia-1212/user_management_final/blob/new-features/new_features.md)
 
-[Link-to-Docker]()  repository in the document - let your work speak for itself! 📄🔗💥
+    Docker Repo Link:
+        [Link-to-Docker]()  
+
+
+repository in the document - let your work speak for itself! 📄🔗💥
 
 2. **Commit History**: Show off your consistent hard work through your commit history like a true coding warrior. **Projects with less than 10 commits will get an automatic 0 - ouch!** 😬⚠️ A significant part of your project's evaluation will be based on your use of issues, commits, and following a professional development process like a boss - prove your coding prowess! 💻🔄🔥
 
