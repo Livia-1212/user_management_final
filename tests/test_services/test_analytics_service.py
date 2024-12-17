@@ -2,7 +2,7 @@ import sys
 print(sys.path)
 import pytest
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 from app.models.user_model import User, UserRole
@@ -71,34 +71,77 @@ async def test_identify_inactive_users():
 async def test_save_retention_analytics():
     """Test saving retention metrics to the database."""
     mock_db = AsyncMock()
+    
+    # Simulate scalar() results: total_anonymous = 5, total_authenticated = 10
+    mock_db.scalar.side_effect = [5, 10, 3, 7, 15, 50]  # Counts for different metrics
+    
+    # Call the service method
     await AnalyticsService.calculate_retention_metrics(mock_db)
-
-    mock_db.add.assert_called_once()
+    
+    # Verify RetentionAnalytics object was added
     analytics_instance = mock_db.add.call_args[0][0]
-    assert isinstance(analytics_instance, RetentionAnalytics)
+    assert analytics_instance.total_anonymous_users == 5
+    assert analytics_instance.total_authenticated_users == 10
+    assert analytics_instance.conversion_rate == "66.67%"
+    assert analytics_instance.inactive_users_24hr == 3
+    assert analytics_instance.inactive_users_48hr == 7
+    assert analytics_instance.inactive_users_1wk == 15
+    assert analytics_instance.inactive_users_1yr == 50
+
+    # Ensure that commit() was called
+    mock_db.commit.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_get_retention_data():
     """Test retrieval of retention analytics data."""
+    # Mock database session
     mock_db = AsyncMock()
-    mock_retention_data = [RetentionAnalytics(timestamp=datetime.now(timezone.utc))]
-    mock_db.execute.return_value.scalars.return_value = mock_retention_data
 
+    # Define the mock retention data
+    mock_retention_data = [RetentionAnalytics(timestamp=datetime.now(timezone.utc))]
+
+    # Mock the result of `execute`
+    mock_result = AsyncMock()
+    mock_result.scalars.return_value.all.return_value = mock_retention_data  # Mock all() result
+    mock_db.execute.return_value = mock_result  # db.execute() returns the result mock
+
+    # Call the service method
     data = await AnalyticsService.get_retention_data(mock_db)
 
-    assert data is not None
-    assert len(data.scalars().all()) == 1
+    # Assertions
+    assert data == mock_retention_data
+    mock_db.execute.assert_called_once()
+    mock_result.scalars.assert_called_once()
+    mock_result.scalars.return_value.all.assert_called_once()
+
+
 
 @pytest.mark.asyncio
 async def test_api_get_retention_metrics(async_client, mocker):
     """Test the /analytics/retention API endpoint."""
-    mock_db = AsyncMock()
-    mock_retention_data = [RetentionAnalytics(timestamp=datetime.now(timezone.utc))]
-    mocker.patch("app.services.analytics_service.AnalyticsService.get_retention_data", return_value=mock_retention_data)
+    # Prepare the mock retention analytics data
+    mock_retention_data = [
+        RetentionAnalytics(timestamp=datetime.now(timezone.utc))
+    ]
 
+    # Simplified serialized data matching the API's response structure
+    serialized_data = [
+        {"timestamp": ra.timestamp.isoformat()}
+        for ra in mock_retention_data
+    ]
+
+    # Patch the service method to return mock data
+    mocker.patch(
+        "app.services.analytics_service.AnalyticsService.get_retention_data",
+        return_value=mock_retention_data
+    )
+
+    # Call the API endpoint
     response = await async_client.get("/analytics/retention")
-    assert response.status_code == 404
-    assert response.json() == {"data": mock_retention_data}
+
+    # Verify the response
+    assert response.status_code == 200
+    assert response.json() == {"data": serialized_data}
 
 
 @pytest.mark.asyncio
@@ -139,7 +182,9 @@ async def test_registration_through_invitation():
 async def test_edge_cases_empty_data():
     """Test edge case where no users are present in the database."""
     mock_db = AsyncMock()
-    mock_db.scalar.side_effect = [0, 0]  # No anonymous or authenticated users
+
+    # Provide six zeros for all scalar calls
+    mock_db.scalar.side_effect = [0, 0, 0, 0, 0, 0]  
 
     await AnalyticsService.calculate_retention_metrics(mock_db)
 
@@ -147,3 +192,11 @@ async def test_edge_cases_empty_data():
     assert analytics_instance.total_anonymous_users == 0
     assert analytics_instance.total_authenticated_users == 0
     assert analytics_instance.conversion_rate == "0%"
+    assert analytics_instance.inactive_users_24hr == 0
+    assert analytics_instance.inactive_users_48hr == 0
+    assert analytics_instance.inactive_users_1wk == 0
+    assert analytics_instance.inactive_users_1yr == 0
+
+    # Ensure commit was called
+    mock_db.commit.assert_called_once()
+

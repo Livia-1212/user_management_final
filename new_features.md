@@ -52,6 +52,9 @@
     - Pagination and sorting for large datasets.
     - RBAC enforcement when attempting to update roles (ADMIN-only access).
     - Edge cases such as invalid query parameters and empty datasets.
+- Ensure the endpoints implementation bugs free
+    - implemented analytics_routes into user_route.py
+    - implemented RetentionAnalytics instance in tests/test_services/test_analytics_service.py includes fields such as conversion_rate and inactive_users_*, and fixed API Endpoint codes. 
 
 ## Step 4: Include Tasks for User Invitations
 

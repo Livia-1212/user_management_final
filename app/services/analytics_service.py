@@ -11,18 +11,17 @@ class AnalyticsService:
         """Update the last login timestamp for a user."""
         user = await db.get(User, user_id)
         if user:
-            now = datetime.now(timezone.utc)  # Corrected 'datetime'
+            now = datetime.now(timezone.utc)
             user.last_login_at = now
             db.add(user)
             await db.commit()
-
 
     @staticmethod
     async def calculate_retention_metrics(db: AsyncSession):
         """Calculate retention metrics and save them into the database."""
         now = datetime.now(timezone.utc)
 
-        # Count total anonymous and authenticated users using select()
+        # Count total anonymous and authenticated users
         total_anonymous = await db.scalar(select(func.count()).where(User.role == "ANONYMOUS"))
         total_authenticated = await db.scalar(select(func.count()).where(User.role == "AUTHENTICATED"))
 
@@ -33,21 +32,40 @@ class AnalyticsService:
             else "0%"
         )
 
-        # Save the metrics to RetentionAnalytics
-        analytics = RetentionAnalytics(
-            total_anonymous_users=total_anonymous,
-            total_authenticated_users=total_authenticated,
-            conversion_rate=conversion_rate,
-            timestamp=now,
+        # Identify inactive users based on last login time
+        inactive_24hr = await db.scalar(
+            select(func.count()).where(User.last_login_at < now - timedelta(hours=24))
         )
+        inactive_48hr = await db.scalar(
+            select(func.count()).where(User.last_login_at < now - timedelta(hours=48))
+        )
+        inactive_1wk = await db.scalar(
+            select(func.count()).where(User.last_login_at < now - timedelta(weeks=1))
+        )
+        inactive_1yr = await db.scalar(
+            select(func.count()).where(User.last_login_at < now - timedelta(days=365))
+        )
+
+        # Construct and save analytics metrics
+        analytics = RetentionAnalytics(
+            total_anonymous_users=total_anonymous or 0,
+            total_authenticated_users=total_authenticated or 0,
+            conversion_rate=conversion_rate,
+            inactive_users_24hr=inactive_24hr or 0,
+            inactive_users_48hr=inactive_48hr or 0,
+            inactive_users_1wk=inactive_1wk or 0,
+            inactive_users_1yr=inactive_1yr or 0
+        )
+
         db.add(analytics)
         await db.commit()
-
 
     @staticmethod
     async def get_retention_data(db: AsyncSession):
         """Retrieve the most recent retention analytics data."""
-        query = await db.execute(
+        result = await db.execute(
             RetentionAnalytics.__table__.select().order_by(RetentionAnalytics.timestamp.desc())
         )
-        return query.scalars().all()
+        # Resolve the result to scalars and fetch all rows
+        analytics_data = await result.scalars().all()
+        return analytics_data

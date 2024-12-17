@@ -21,6 +21,7 @@ Key Highlights:
 from builtins import dict, int, len, str
 from datetime import timedelta
 from uuid import UUID
+from app.services.analytics_service import AnalyticsService
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -217,6 +218,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Async
 
         return {"access_token": access_token, "token_type": "bearer"}
     raise HTTPException(status_code=401, detail="Incorrect email or password.")
+
+@router.get("/analytics/retention", name="get_retention_metrics", tags=["Analytics"])
+async def get_retention_metrics(db: AsyncSession = Depends(get_db)):
+    """
+    Retrieve retention analytics data.
+    """
+    retention_data = await AnalyticsService.get_retention_data(db)
+    return {"data": retention_data}
 
 @router.post("/login/", include_in_schema=False, response_model=TokenResponse, tags=["Login and Registration"])
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_db)):
