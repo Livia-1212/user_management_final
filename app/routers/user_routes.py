@@ -30,7 +30,7 @@ from app.dependencies import get_current_user, get_db, get_email_service, requir
 from app.models.user_model import User, UserRole
 from app.schemas.pagination_schema import EnhancedPagination
 from app.schemas.token_schema import TokenResponse
-from app.schemas.user_schemas import LoginRequest, UserBase, UserCreate, UserListResponse, UserResponse, UserUpdate
+from app.schemas.user_schemas import LoginRequest, UserBase, UserCreate, UserListResponse, UserResponse, UserSearchRequest, UserUpdate
 from app.services.user_service import UserService
 from app.services.jwt_service import create_access_token
 from app.utils.link_generation import create_user_links, generate_pagination_links
@@ -227,23 +227,6 @@ async def get_retention_metrics(db: AsyncSession = Depends(get_db)):
     retention_data = await AnalyticsService.get_retention_data(db)
     return {"data": retention_data}
 
-@router.post("/login/", include_in_schema=False, response_model=TokenResponse, tags=["Login and Registration"])
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_db)):
-    if await UserService.is_account_locked(session, form_data.username):
-        raise HTTPException(status_code=400, detail="Account locked due to too many failed login attempts.")
-
-    user = await UserService.login_user(session, form_data.username, form_data.password)
-    if user:
-        access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
-
-        access_token = create_access_token(
-            data={"sub": user.email, "role": str(user.role.name)},
-            expires_delta=access_token_expires
-        )
-
-        return {"access_token": access_token, "token_type": "bearer"}
-    raise HTTPException(status_code=401, detail="Incorrect email or password.")
-
 
 @router.get("/verify-email/{user_id}/{token}", status_code=status.HTTP_200_OK, name="verify_email", tags=["Login and Registration"])
 async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get_db), email_service: EmailService = Depends(get_email_service)):
@@ -261,65 +244,33 @@ from datetime import datetime
 from sqlalchemy.sql import func
 from fastapi import Request
 
-@router.get("/users/search", response_model=UserListResponse, name="search_users", tags=["User Management Requires (Admin or Manager Roles)"])
+@router.post(
+    "/users/search",
+    response_model=UserListResponse,
+    name="search_users",
+    tags=["User Management Requires (Admin or Manager Roles)"]
+)
 async def search_users(
-    request: Request,  # Added `request` parameter
+    body: UserSearchRequest,  # Updated schema with simplified fields
     db: AsyncSession = Depends(get_db),
-    nickname: str | None = Query(None, description="Search by nickname"),
-    # email: str | None = Query(None, description="Search by email"),
-    # role: UserRole | None = Query(None, description="Filter by role"),
-    # is_locked: bool | None = Query(None, description="Filter by account locked status"),
-    # is_converted: bool | None = Query(None, description="Filter by conversion status"),
-    # start_date: str | None = Query(None, description="Filter by registration start date (YYYY-MM-DD)"),
-    # end_date: str | None = Query(None, description="Filter by registration end date (YYYY-MM-DD)"),
-    # skip: int = Query(0, description="Number of records to skip for pagination"),
-    # limit: int = Query(10, description="Number of records to return for pagination"),
-    # current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))
+    current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))
 ):
     """
-    Search and filter users based on criteria.
-
-    Parameters:
-        - **nickname**: Partial match for nickname.
-        - **email**: Partial match for email.
-        - **role**: Filter by user role.
-        - **is_locked**: Filter by account locked status.
-        - **is_converted**: Filter by conversion status.
-        - **start_date**: Filter by registration start date.
-        - **end_date**: Filter by registration end date.
-        - **skip**: Pagination - number of records to skip.
-        - **limit**: Pagination - number of records to return.
-    # """
-    # try:
-    #     # Validate date inputs
-    #     if start_date:
-    #         start_date = datetime.strptime(start_date, "%Y-%m-%d")
-    #     if end_date:
-    #         end_date = datetime.strptime(end_date, "%Y-%m-%d")
-    # except ValueError:
-    #     raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
-
-    print("test")
+    Search and filter users based on criteria provided in the request body.
+    """
     query = select(User)
 
-    # Apply filters based on query parameters
-    if nickname:
-        query = query.where(User.nickname.ilike(f"%{nickname}%"))
-    # if email:
-    #     query = query.where(User.email.ilike(f"%{email}%"))
-    # if role:
-    #     query = query.where(User.role == role)
-    # if is_locked is not None:
-    #     query = query.where(User.is_locked == is_locked)
-    # if is_converted is not None:
-    #     query = query.where(User.is_converted == is_converted)
-    # if start_date:
-    #     query = query.where(User.created_at >= start_date)
-    # if end_date:
-    #     query = query.where(User.created_at <= end_date)
+    # Apply filters dynamically
+    filters = {
+        User.nickname.ilike(f"%{body.nickname}%"): body.nickname,
+        User.email.ilike(f"%{body.email}%"): body.email,
+        User.role == body.role: body.role,
+    }
 
-    # Apply pagination
-    query = query.offset(skip).limit(limit)
+    for condition, value in filters.items():
+        if value:
+            query = query.where(condition)
+
 
     # Execute the query
     result = await db.execute(query)
@@ -330,11 +281,12 @@ async def search_users(
     total_result = await db.execute(total_query)
     total_users = total_result.scalar()
 
-    # Construct response
+    # Construct the response
     return UserListResponse(
         total=total_users,
         items=[UserResponse.model_validate(user) for user in users],
-        page=skip // limit + 1,
+        page=1,  # Fixed to 1 since pagination isn't in the body
         size=len(users),
-        links=generate_pagination_links(request, skip, limit, total_users)
+        links=None  # Placeholder for HATEOAS links
     )
+
