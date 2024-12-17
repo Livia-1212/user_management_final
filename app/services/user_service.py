@@ -1,7 +1,7 @@
 from builtins import Exception, bool, classmethod, int, str
 from datetime import datetime, timezone
 import secrets
-from typing import Optional, Dict, List
+from typing import Any, Optional, Dict, List
 from pydantic import ValidationError
 from sqlalchemy import func, null, update, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -194,6 +194,44 @@ class UserService:
                 session.add(user)
                 await session.commit()
         return None
+    
+    @classmethod
+    async def invite_user(cls, session: AsyncSession, email: str, inviter_id: UUID, email_service: Any) -> bool:
+        """
+        Invite a new user by creating an invitation and sending an email.
+
+        Args:
+            session: Database session.
+            email: Email address of the invitee.
+            inviter_id: The ID of the user sending the invitation.
+            email_service: Service for sending emails.
+
+        Returns:
+            True if the invitation was successfully sent, False otherwise.
+        """
+        try:
+            # Generate a verification token
+            invitation_token = generate_verification_token()
+            
+            # Create a new user with invited_by_user_id and token
+            user = User(
+                email=email,
+                invited_by_user_id=inviter_id,
+                verification_token=invitation_token
+            )
+            session.add(user)
+            await session.commit()
+
+            # Send the invitation email
+            invite_link = f"{get_settings().server_base_url}/register?token={invitation_token}"
+            await email_service.send_user_email(
+                {"email": email, "invitation_link": invite_link}, "invitation"
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to invite user: {e}")
+            await session.rollback()
+            return False
 
     @classmethod
     async def is_account_locked(cls, session: AsyncSession, email: str) -> bool:
@@ -216,14 +254,19 @@ class UserService:
 
     @classmethod
     async def verify_email_with_token(cls, session: AsyncSession, user_id: UUID, token: str) -> bool:
-        user = await cls.get_by_id(session, user_id)
-        if user and user.verification_token == token:
+        user = await session.get(User, user_id)
+        if user is None:
+            return False
+        
+        if user.verification_token == token:
             user.email_verified = True
             user.verification_token = None  # Clear the token once used
+
             if user.role == UserRole.ANONYMOUS:
                 user.role = UserRole.AUTHENTICATED
+
             session.add(user)
-            await session.commit()
+            await session.commit()  # Commit changes
             return True
         return False
 
