@@ -7,3 +7,4 @@ qr_codes
 .env.sample
 .coverage
 .env
+venv

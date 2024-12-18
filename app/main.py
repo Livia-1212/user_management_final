@@ -2,7 +2,6 @@ from builtins import Exception
 from fastapi import FastAPI
 from starlette.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
-from fastapi_utils.tasks import repeat_every  # Import for scheduling background tasks
 from app.database import Database, get_db
 from app.dependencies import get_settings
 from app.routers import user_routes
@@ -37,12 +36,6 @@ async def startup_event():
     settings = get_settings()
     Database.initialize(settings.database_url, settings.debug)
 
-# Background task for retention analytics
-@app.on_event("startup")
-@repeat_every(seconds=3600)  # Run every hour
-async def periodic_retention_metrics():
-    async with get_db() as db:
-        await AnalyticsService.calculate_retention_metrics(db)
 
 # Global exception handler
 @app.exception_handler(Exception)
