@@ -36,15 +36,6 @@ class AnalyticsService:
         inactive_24hr = await db.scalar(
             select(func.count()).where(User.last_login_at < now - timedelta(hours=24))
         )
-        inactive_48hr = await db.scalar(
-            select(func.count()).where(User.last_login_at < now - timedelta(hours=48))
-        )
-        inactive_1wk = await db.scalar(
-            select(func.count()).where(User.last_login_at < now - timedelta(weeks=1))
-        )
-        inactive_1yr = await db.scalar(
-            select(func.count()).where(User.last_login_at < now - timedelta(days=365))
-        )
 
         # Construct and save analytics metrics
         analytics = RetentionAnalytics(
@@ -52,9 +43,6 @@ class AnalyticsService:
             total_authenticated_users=total_authenticated or 0,
             conversion_rate=conversion_rate,
             inactive_users_24hr=inactive_24hr or 0,
-            inactive_users_48hr=inactive_48hr or 0,
-            inactive_users_1wk=inactive_1wk or 0,
-            inactive_users_1yr=inactive_1yr or 0
         )
 
         db.add(analytics)

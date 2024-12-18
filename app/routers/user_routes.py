@@ -222,10 +222,20 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Async
 @router.get("/analytics/retention", name="get_retention_metrics", tags=["Analytics"])
 async def get_retention_metrics(db: AsyncSession = Depends(get_db)):
     """
-    Retrieve retention analytics data.
+    Retrieve retention analytics data. If no data exists, calculate and store metrics.
     """
+    from app.services.analytics_service import AnalyticsService
+
+    # Check if retention data exists
     retention_data = await AnalyticsService.get_retention_data(db)
+
+    # If no data, calculate retention metrics and fetch again
+    if not retention_data:
+        await AnalyticsService.calculate_retention_metrics(db)
+        retention_data = await AnalyticsService.get_retention_data(db)
+
     return {"data": retention_data}
+
 
 
 @router.get("/verify-email/{user_id}/{token}", status_code=status.HTTP_200_OK, name="verify_email", tags=["Login and Registration"])

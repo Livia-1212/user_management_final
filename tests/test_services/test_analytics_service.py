@@ -53,10 +53,7 @@ async def test_identify_inactive_users():
     mock_db = AsyncMock()
     now = datetime.now(timezone.utc)
     mock_db.scalar.side_effect = [
-        3,  # 24-hour inactive
-        7,  # 48-hour inactive
-        15,  # 1-week inactive
-        50,  # 1-year inactive
+        3,  # 24-hour inactive 
     ]
 
     await AnalyticsService.calculate_retention_metrics(mock_db)
@@ -199,3 +196,49 @@ async def test_edge_cases_empty_data():
     # Ensure commit was called
     mock_db.commit.assert_called_once()
 
+@pytest.mark.asyncio
+async def test_handle_missing_last_login_timestamps():
+    """Test retention analytics when some users have no last login timestamps."""
+    mock_db = AsyncMock()
+
+    # Mock users with missing last_login_at timestamps
+    mock_db.scalar.side_effect = [
+        10,  # Total anonymous users
+        20,  # Total authenticated users
+        0,   # Inactive users in the last 24 hours
+    ]
+
+    await AnalyticsService.calculate_retention_metrics(mock_db)
+
+    # Verify retention analytics instance created
+    analytics_instance = mock_db.add.call_args[0][0]
+    assert analytics_instance.total_anonymous_users == 10
+    assert analytics_instance.total_authenticated_users == 20
+    assert analytics_instance.conversion_rate == "66.67%"
+    assert analytics_instance.inactive_users_24hr == 0
+
+    mock_db.commit.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_large_user_counts():
+    """Test retention analytics with large numbers of users to ensure scalability."""
+    mock_db = AsyncMock()
+
+    # Simulate large numbers of users
+    mock_db.scalar.side_effect = [
+        1_000_000,  # Total anonymous users
+        2_000_000,  # Total authenticated users
+        500_000,    # Inactive users in the last 24 hours
+    ]
+
+    await AnalyticsService.calculate_retention_metrics(mock_db)
+
+    # Verify retention analytics instance created
+    analytics_instance = mock_db.add.call_args[0][0]
+    assert analytics_instance.total_anonymous_users == 1_000_000
+    assert analytics_instance.total_authenticated_users == 2_000_000
+    assert analytics_instance.conversion_rate == "66.67%"
+    assert analytics_instance.inactive_users_24hr == 500_000
+
+    mock_db.commit.assert_called_once()

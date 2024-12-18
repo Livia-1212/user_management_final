@@ -118,9 +118,6 @@ class RetentionAnalytics(Base):
     total_authenticated_users: Mapped[int] = Column(Integer, default=0)
     conversion_rate: Mapped[str] = Column(String(10), nullable=False)  # Example: "20%"
     inactive_users_24hr: Mapped[int] = Column(Integer, default=0)
-    inactive_users_48hr: Mapped[int] = Column(Integer, default=0)
-    inactive_users_1wk: Mapped[int] = Column(Integer, default=0)
-    inactive_users_1yr: Mapped[int] = Column(Integer, default=0)
 
     def __repr__(self):
         """Provides a readable representation of analytics data."""
