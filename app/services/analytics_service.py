@@ -1,3 +1,4 @@
+from unittest.mock import AsyncMock
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func, select
 from datetime import datetime, timezone, timedelta
@@ -15,6 +16,29 @@ class AnalyticsService:
             user.last_login_at = now
             db.add(user)
             await db.commit()
+
+    @staticmethod
+    async def get_retention_data(db: AsyncSession):
+        """Retrieve the most recent retention analytics data."""
+        result = await db.execute(
+            select(RetentionAnalytics).order_by(RetentionAnalytics.timestamp.desc())
+        )
+        retention_records = await result.scalars().all()  # Await the coroutine
+
+        # Convert RetentionAnalytics objects to dictionaries
+        return [
+            {
+                "timestamp": record.timestamp.isoformat(),
+                "total_anonymous_users": record.total_anonymous_users,
+                "total_authenticated_users": record.total_authenticated_users,
+                "conversion_rate": record.conversion_rate,
+                "inactive_users_24hr": record.inactive_users_24hr,
+            }
+            for record in retention_records
+        ]
+
+        
+
 
     @staticmethod
     async def calculate_retention_metrics(db: AsyncSession):
@@ -48,15 +72,6 @@ class AnalyticsService:
         db.add(analytics)
         await db.commit()
 
-
-    @staticmethod
-    async def get_retention_data(db: AsyncSession):
-        """Retrieve the most recent retention analytics data."""
-        result = await db.execute(
-            RetentionAnalytics.__table__.select().order_by(RetentionAnalytics.timestamp.desc())
-        )
-        analytics_data = result.scalars().all()  # Correct: no 'await' here
-        return analytics_data
 
 
 

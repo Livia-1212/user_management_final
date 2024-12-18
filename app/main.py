@@ -6,8 +6,10 @@ from fastapi_utils.tasks import repeat_every  # Import for scheduling background
 from app.database import Database, get_db
 from app.dependencies import get_settings
 from app.routers import user_routes
+from app.routers.user_routes import router as analytics_router  # Import analytics router
 from app.services.analytics_service import AnalyticsService  # Import the analytics service
 from app.utils.api_description import getDescription
+
 app = FastAPI(
     title="User Management",
     description=getDescription(),
@@ -21,8 +23,6 @@ app = FastAPI(
 )
 
 # CORS middleware configuration
-# This middleware will enable CORS and allow requests from any origin
-# It can be configured to allow specific methods, headers, and origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allow all origins
@@ -53,3 +53,4 @@ async def exception_handler(request, exc):
 
 # Include routers
 app.include_router(user_routes.router)
+app.include_router(analytics_router, prefix="/analytics", tags=["Analytics"])  # Add analytics router

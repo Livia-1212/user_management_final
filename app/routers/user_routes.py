@@ -21,6 +21,7 @@ Key Highlights:
 from builtins import dict, int, len, str
 from datetime import timedelta
 from uuid import UUID
+import app
 from app.services.analytics_service import AnalyticsService
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -31,11 +32,13 @@ from app.models.user_model import User, UserRole
 from app.schemas.pagination_schema import EnhancedPagination
 from app.schemas.token_schema import TokenResponse
 from app.schemas.user_schemas import LoginRequest, UserBase, UserCreate, UserListResponse, UserResponse, UserSearchRequest, UserUpdate
+from app.services.analytics_service import AnalyticsService 
 from app.services.user_service import UserService
 from app.services.jwt_service import create_access_token
 from app.utils.link_generation import create_user_links, generate_pagination_links
 from app.dependencies import get_settings
 from app.services.email_service import EmailService
+
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
@@ -219,24 +222,34 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Async
         return {"access_token": access_token, "token_type": "bearer"}
     raise HTTPException(status_code=401, detail="Incorrect email or password.")
 
+@staticmethod
+async def get_retention_data(db: AsyncSession):
+    """Retrieve the most recent retention analytics data."""
+    result = await db.execute(
+        select(RetentionAnalytics).order_by(RetentionAnalytics.timestamp.desc())
+    )
+    retention_records = result.scalars().all()
+    
+    # Convert to a list of dictionaries
+    return [
+        {
+            "timestamp": record.timestamp.isoformat(),
+            "total_anonymous_users": record.total_anonymous_users,
+            "total_authenticated_users": record.total_authenticated_users,
+            "conversion_rate": record.conversion_rate,
+            "inactive_users_24hr": record.inactive_users_24hr,
+        }
+        for record in retention_records
+    ]
+
+
 @router.get("/analytics/retention", name="get_retention_metrics", tags=["Analytics"])
 async def get_retention_metrics(db: AsyncSession = Depends(get_db)):
     """
-    Retrieve retention analytics data. If no data exists, calculate and store metrics.
+    Retrieve retention analytics data.
     """
-    from app.services.analytics_service import AnalyticsService
-
-    # Check if retention data exists
     retention_data = await AnalyticsService.get_retention_data(db)
-
-    # If no data, calculate retention metrics and fetch again
-    if not retention_data:
-        await AnalyticsService.calculate_retention_metrics(db)
-        retention_data = await AnalyticsService.get_retention_data(db)
-
     return {"data": retention_data}
-
-
 
 @router.get("/verify-email/{user_id}/{token}", status_code=status.HTTP_200_OK, name="verify_email", tags=["Login and Registration"])
 async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get_db), email_service: EmailService = Depends(get_email_service)):
