@@ -12,7 +12,7 @@
 
 
     QA-Issue & Debugging Branch:
-        [5-QA-issues](https://github.com/Livia-1212/user_management_final/tree/1-Bug)
+        [5-QA-issues]([https://github.com/Livia-1212/user_management_final/tree/1-Bug](https://github.com/Livia-1212/user_management_final/issues?q=is%3Aissue+is%3Aclosed))
 
     New Unit Testing:
         [10-NEW-tests](https://github.com/Livia-1212/user_management_final/blob/new-features/tests/test_services/test_analytics_service.py) 
