@@ -1,12 +1,12 @@
 from builtins import bool, int, str
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 import uuid
 from sqlalchemy import (
-    Column, String, Integer, DateTime, Boolean, func, Enum as SQLAlchemyEnum
+    Column, String, Integer, DateTime, Boolean, func, Enum as SQLAlchemyEnum, ForeignKey
 )
 from sqlalchemy.dialects.postgresql import UUID, ENUM
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 class UserRole(Enum):
@@ -73,6 +73,10 @@ class User(Base):
     verification_token = Column(String, nullable=True)
     email_verified: Mapped[bool] = Column(Boolean, default=False, nullable=False)
     hashed_password: Mapped[str] = Column(String(255), nullable=False)
+     # New fields for retention analytics
+    invited_by_user_id: Mapped[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    invited_by = relationship("User", remote_side="User.id", backref="invited_users")
+    is_converted: Mapped[bool] = Column(Boolean, default=False)
 
 
     def __repr__(self) -> str:
@@ -95,3 +99,31 @@ class User(Base):
         """Updates the professional status and logs the update time."""
         self.is_professional = status
         self.professional_status_updated_at = func.now()
+
+    # New feature of retention analytics
+    def update_last_login(self):
+        """Updates the last login timestamp."""
+        self.last_login_at = datetime.now(timezone.utc)
+
+
+class RetentionAnalytics(Base):
+    """
+    Tracks user retention analytics.
+    """
+    __tablename__ = "retention_analytics"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    timestamp: Mapped[datetime] = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+    total_anonymous_users: Mapped[int] = Column(Integer, default=0)
+    total_authenticated_users: Mapped[int] = Column(Integer, default=0)
+    conversion_rate: Mapped[str] = Column(String(10), nullable=False)  # Example: "20%"
+    inactive_users_24hr: Mapped[int] = Column(Integer, default=0)
+
+    def __repr__(self):
+        """Provides a readable representation of analytics data."""
+        return (
+            f"<RetentionAnalytics {self.timestamp}: "
+            f"Anonymous={self.total_anonymous_users}, "
+            f"Authenticated={self.total_authenticated_users}, "
+            f"Conversion={self.conversion_rate}>"
+        )

@@ -29,3 +29,4 @@ class SMTPClient:
         except Exception as e:
             logging.error(f"Failed to send email: {str(e)}")
             raise
+

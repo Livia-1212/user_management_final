@@ -17,6 +17,7 @@ def validate_url(url: Optional[str]) -> Optional[str]:
         raise ValueError('Invalid URL format')
     return url
 
+
 class UserBase(BaseModel):
     email: EmailStr = Field(..., example="john.doe@example.com")
     nickname: Optional[str] = Field(None, min_length=3, pattern=r'^[\w-]+$', example=generate_nickname())
@@ -24,18 +25,20 @@ class UserBase(BaseModel):
     last_name: Optional[str] = Field(None, example="Doe")
     bio: Optional[str] = Field(None, example="Experienced software developer specializing in web applications.")
     profile_picture_url: Optional[str] = Field(None, example="https://example.com/profiles/john.jpg")
-    linkedin_profile_url: Optional[str] =Field(None, example="https://linkedin.com/in/johndoe")
+    linkedin_profile_url: Optional[str] = Field(None, example="https://linkedin.com/in/johndoe")
     github_profile_url: Optional[str] = Field(None, example="https://github.com/johndoe")
     role: UserRole
 
     _validate_urls = validator('profile_picture_url', 'linkedin_profile_url', 'github_profile_url', pre=True, allow_reuse=True)(validate_url)
- 
+
     class Config:
         from_attributes = True
+
 
 class UserCreate(UserBase):
     email: EmailStr = Field(..., example="john.doe@example.com")
     password: str = Field(..., example="Secure*1234")
+
 
 class UserUpdate(UserBase):
     email: Optional[EmailStr] = Field(None, example="john.doe@example.com")
@@ -44,7 +47,7 @@ class UserUpdate(UserBase):
     last_name: Optional[str] = Field(None, example="Doe")
     bio: Optional[str] = Field(None, example="Experienced software developer specializing in web applications.")
     profile_picture_url: Optional[str] = Field(None, example="https://example.com/profiles/john.jpg")
-    linkedin_profile_url: Optional[str] =Field(None, example="https://linkedin.com/in/johndoe")
+    linkedin_profile_url: Optional[str] = Field(None, example="https://linkedin.com/in/johndoe")
     github_profile_url: Optional[str] = Field(None, example="https://github.com/johndoe")
     role: Optional[str] = Field(None, example="AUTHENTICATED")
 
@@ -54,6 +57,7 @@ class UserUpdate(UserBase):
             raise ValueError("At least one field must be provided for update")
         return values
 
+
 class UserResponse(UserBase):
     id: uuid.UUID = Field(..., example=uuid.uuid4())
     email: EmailStr = Field(..., example="john.doe@example.com")
@@ -61,13 +65,16 @@ class UserResponse(UserBase):
     is_professional: Optional[bool] = Field(default=False, example=True)
     role: UserRole
 
+
 class LoginRequest(BaseModel):
     email: str = Field(..., example="john.doe@example.com")
     password: str = Field(..., example="Secure*1234")
 
+
 class ErrorResponse(BaseModel):
     error: str = Field(..., example="Not Found")
     details: Optional[str] = Field(None, example="The requested resource was not found.")
+
 
 class UserListResponse(BaseModel):
     items: List[UserResponse] = Field(..., example=[{
@@ -81,3 +88,17 @@ class UserListResponse(BaseModel):
     total: int = Field(..., example=100)
     page: int = Field(..., example=1)
     size: int = Field(..., example=10)
+
+
+# New schema for search criteria
+class UserSearchRequest(BaseModel):
+    nickname: Optional[str] = Field(None, description="Search by nickname")
+    email: Optional[str] = Field(None, description="Search by email")
+    role: Optional[str] = Field(None, description="Search by role")
+
+    @root_validator(pre=True)
+    def check_at_least_one_field(cls, values):
+        """Ensure at least one search criteria is provided."""
+        if not any(values.get(field) for field in ["nickname", "email", "role"]):
+            raise ValueError("At least one of 'nickname', 'email', or 'role' must be provided.")
+        return values

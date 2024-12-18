@@ -4,7 +4,32 @@
 
 ## Submission and Grading: 📝✏️📈
 
-1. **Reflection Document**: Submit a 1-2 page Word document reflecting on your learnings throughout the course and your experience working on this epic project. Include links to the closed issues for the **5 QA issues, 10 NEW tests, and 1 Feature** you'll be graded on. Make sure your project successfully deploys to DockerHub and include a link to your Docker repository in the document - let your work speak for itself! 📄🔗💥
+1. **Reflection Document**: 
+
+    Word Document Reflection: 
+        [Document-Reflection]()
+
+    >>> What I have learnt:
+       how SQLAlchemy’s execute and scalars interact when mocked. When we mock these methods using AsyncMock or MagicMock, the scalars() method can behave like a coroutine if not mocked correctly, leading to confusion in the test environment.
+
+       
+
+    QA-Issue & Debugging Branch:
+        [5-QA-issues](https://github.com/Livia-1212/user_management_final/tree/1-Bug)
+
+    New Unit Testing:
+        [10-NEW-tests](https://github.com/Livia-1212/user_management_final/blob/new-features/tests/test_services/test_analytics_service.py) 
+
+    New Feature Added Branch:
+        [NewFeature-Branch](https://github.com/Livia-1212/user_management_final/tree/new-features)
+
+    [New-feature-documentation] (https://github.com/Livia-1212/user_management_final/blob/new-features/new_features.md)
+
+    Docker Repo Link:
+        [Link-to-Docker]()  
+
+
+repository in the document - let your work speak for itself! 📄🔗💥
 
 2. **Commit History**: Show off your consistent hard work through your commit history like a true coding warrior. **Projects with less than 10 commits will get an automatic 0 - ouch!** 😬⚠️ A significant part of your project's evaluation will be based on your use of issues, commits, and following a professional development process like a boss - prove your coding prowess! 💻🔄🔥
 

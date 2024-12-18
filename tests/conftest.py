@@ -165,10 +165,10 @@ async def users_with_same_role_50_users(db_session):
     users = []
     for _ in range(50):
         user_data = {
-            "nickname": fake.user_name(),
+            "nickname": fake.unique.user_name(),
             "first_name": fake.first_name(),
             "last_name": fake.last_name(),
-            "email": fake.email(),
+            "email": fake.unique.email(),
             "hashed_password": fake.password(),
             "role": UserRole.AUTHENTICATED,
             "email_verified": False,

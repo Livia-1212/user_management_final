@@ -17,17 +17,18 @@ ENV PYTHONUNBUFFERED=1 \
 # RUN apt-get update && apt-get install -y --no-install-recommends \
 #     gcc \
 #     libpq-dev \
+#     netcat \
 #     && apt-get install -y libc-bin=2.36-9+deb12u7 \
 #     && apt-get clean \
 #     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies in /.venv
-# COPY requirements.txt .
-#     && pip install --upgrade pip \
-#     && pip install -r requirements.txt
+COPY requirements.txt .
+RUN pip install --upgrade pip \
+    && pip install -r requirements.txt
+
 RUN python -m venv /.venv \
     && . /.venv/bin/activate \
-
 
 # Define a second stage for the runtime, using the same Debian Bookworm slim image
 # FROM python:3.12-slim-bookworm as final
@@ -53,8 +54,9 @@ COPY ./requirements.txt /myapp/requirements.txt
 
 
 # Upgrade pip and install Python dependencies from requirements file
-RUN pip install --upgrade pip \
-    && pip install -r requirements.txt
+# RUN pip install --upgrade pip \
+#     && pip install -r requirements.txt
+
 # Create and switch to a non-root user
 RUN useradd -m myuser
 USER myuser

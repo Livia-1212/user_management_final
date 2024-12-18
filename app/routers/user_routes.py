@@ -21,18 +21,25 @@ Key Highlights:
 from builtins import dict, int, len, str
 from datetime import timedelta
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Response, status, Request
+import app
+from app.services.analytics_service import AnalyticsService
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.dependencies import get_current_user, get_db, get_email_service, require_role
+from sqlalchemy.future import select
+from app.dependencies import get_current_user, get_db, get_email_service, require_role, get_settings
+from app.models.user_model import User, UserRole
 from app.schemas.pagination_schema import EnhancedPagination
 from app.schemas.token_schema import TokenResponse
-from app.schemas.user_schemas import LoginRequest, UserBase, UserCreate, UserListResponse, UserResponse, UserUpdate
+from app.schemas.user_schemas import LoginRequest, UserBase, UserCreate, UserListResponse, UserResponse, UserSearchRequest, UserUpdate
+from app.services.analytics_service import AnalyticsService 
 from app.services.user_service import UserService
 from app.services.jwt_service import create_access_token
 from app.utils.link_generation import create_user_links, generate_pagination_links
 from app.dependencies import get_settings
 from app.services.email_service import EmailService
+
+
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 settings = get_settings()
@@ -86,10 +93,9 @@ async def update_user(user_id: UUID, user_update: UserUpdate, request: Request, 
     - **user_id**: UUID of the user to update.
     - **user_update**: UserUpdate model with updated user information.
     """
-    user_data = user_update.model_dump(exclude_unset=True)
-    updated_user = await UserService.update(db, user_id, user_data)
+    updated_user = await UserService.update(db, user_id, user_update.model_dump(), current_user)
     if not updated_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found or unauthorized action.")
 
     return UserResponse.model_construct(
         id=updated_user.id,
@@ -216,23 +222,34 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Async
         return {"access_token": access_token, "token_type": "bearer"}
     raise HTTPException(status_code=401, detail="Incorrect email or password.")
 
-@router.post("/login/", include_in_schema=False, response_model=TokenResponse, tags=["Login and Registration"])
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_db)):
-    if await UserService.is_account_locked(session, form_data.username):
-        raise HTTPException(status_code=400, detail="Account locked due to too many failed login attempts.")
+@staticmethod
+async def get_retention_data(db: AsyncSession):
+    """Retrieve the most recent retention analytics data."""
+    result = await db.execute(
+        select(RetentionAnalytics).order_by(RetentionAnalytics.timestamp.desc())
+    )
+    retention_records = result.scalars().all()
+    
+    # Convert to a list of dictionaries
+    return [
+        {
+            "timestamp": record.timestamp.isoformat(),
+            "total_anonymous_users": record.total_anonymous_users,
+            "total_authenticated_users": record.total_authenticated_users,
+            "conversion_rate": record.conversion_rate,
+            "inactive_users_24hr": record.inactive_users_24hr,
+        }
+        for record in retention_records
+    ]
 
-    user = await UserService.login_user(session, form_data.username, form_data.password)
-    if user:
-        access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
 
-        access_token = create_access_token(
-            data={"sub": user.email, "role": str(user.role.name)},
-            expires_delta=access_token_expires
-        )
-
-        return {"access_token": access_token, "token_type": "bearer"}
-    raise HTTPException(status_code=401, detail="Incorrect email or password.")
-
+@router.get("/analytics/retention", name="get_retention_metrics", tags=["Analytics"])
+async def get_retention_metrics(db: AsyncSession = Depends(get_db)):
+    """
+    Retrieve retention analytics data.
+    """
+    retention_data = await AnalyticsService.get_retention_data(db)
+    return {"data": retention_data}
 
 @router.get("/verify-email/{user_id}/{token}", status_code=status.HTTP_200_OK, name="verify_email", tags=["Login and Registration"])
 async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get_db), email_service: EmailService = Depends(get_email_service)):
@@ -245,3 +262,54 @@ async def verify_email(user_id: UUID, token: str, db: AsyncSession = Depends(get
     if await UserService.verify_email_with_token(db, user_id, token):
         return {"message": "Email verified successfully"}
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token")
+
+from datetime import datetime
+from sqlalchemy.sql import func
+from fastapi import Request
+
+@router.post(
+    "/users/search",
+    response_model=UserListResponse,
+    name="search_users",
+    tags=["User Management Requires (Admin or Manager Roles)"]
+)
+async def search_users(
+    body: UserSearchRequest,  # Updated schema with simplified fields
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))
+):
+    """
+    Search and filter users based on criteria provided in the request body.
+    """
+    query = select(User)
+
+    # Apply filters dynamically
+    filters = {
+        User.nickname.ilike(f"%{body.nickname}%"): body.nickname,
+        User.email.ilike(f"%{body.email}%"): body.email,
+        User.role == body.role: body.role,
+    }
+
+    for condition, value in filters.items():
+        if value:
+            query = query.where(condition)
+
+
+    # Execute the query
+    result = await db.execute(query)
+    users = result.scalars().all()
+
+    # Count total users for pagination
+    total_query = select(func.count()).select_from(User)
+    total_result = await db.execute(total_query)
+    total_users = total_result.scalar()
+
+    # Construct the response
+    return UserListResponse(
+        total=total_users,
+        items=[UserResponse.model_validate(user) for user in users],
+        page=1,  # Fixed to 1 since pagination isn't in the body
+        size=len(users),
+        links=None  # Placeholder for HATEOAS links
+    )
+

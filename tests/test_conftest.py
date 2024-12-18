@@ -4,9 +4,14 @@ from builtins import len
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.future import select
-
+from app.main import app
 from app.models.user_model import User, UserRole
 from app.utils.security import verify_password
+
+@pytest.fixture
+async def client():
+    async with AsyncClient(app=app, base_url="http://testserver") as ac:
+        yield ac
 
 @pytest.mark.asyncio
 async def test_user_creation(db_session, verified_user):

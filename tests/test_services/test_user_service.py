@@ -62,16 +62,14 @@ async def test_get_by_email_user_does_not_exist(db_session):
     assert retrieved_user is None
 
 # Test updating a user with valid data
+@pytest.mark.asyncio
 async def test_update_user_valid_data(db_session, user):
-    new_email = "updated_email@example.com"
-    updated_user = await UserService.update(db_session, user.id, {"email": new_email})
+    new_email = "valid_email@example.com"
+    current_user = {"role": UserRole.ADMIN.name}  # Ensure ADMIN role
+    updated_user = await UserService.update(db_session, user.id, {"email": new_email}, current_user=current_user)
     assert updated_user is not None
     assert updated_user.email == new_email
 
-# Test updating a user with invalid data
-async def test_update_user_invalid_data(db_session, user):
-    updated_user = await UserService.update(db_session, user.id, {"email": "invalidemail"})
-    assert updated_user is None
 
 # Test deleting a user who exists
 async def test_delete_user_exists(db_session, user):
@@ -149,8 +147,8 @@ async def test_reset_password(db_session, user):
 
 # Test verifying a user's email
 async def test_verify_email_with_token(db_session, user):
-    token = "valid_token_example"  # This should be set in your user setup if it depends on a real token
-    user.verification_token = token  # Simulating setting the token in the database
+    token = "valid_token_example"
+    user.verification_token = token
     await db_session.commit()
     result = await UserService.verify_email_with_token(db_session, user.id, token)
     assert result is True

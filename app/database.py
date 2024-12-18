@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker
+from contextlib import asynccontextmanager
 
 Base = declarative_base()
 
@@ -23,3 +24,15 @@ class Database:
         if cls._session_factory is None:
             raise ValueError("Database not initialized. Call `initialize()` first.")
         return cls._session_factory
+
+
+# Add this function
+@asynccontextmanager
+async def get_db():
+    """Provide a database session for FastAPI dependencies."""
+    session_factory = Database.get_session_factory()
+    async with session_factory() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
