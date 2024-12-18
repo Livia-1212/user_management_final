@@ -29,30 +29,3 @@
 
 
 
-## Managing the Project Workload: Stay Focused, Stay Victorious ⏱️🧠⚡
-
-**Remaining Issue**
-
- For Maintain a Working Main Branch: The github workflow action might not pass 100% because Pydantic Core on my end requirements.txt just would not be installed properly. The error is:
-'''
-    Preparing metadata (pyproject.toml) ... error
-    error: subprocess-exited-with-error
-    
-    × Preparing metadata (pyproject.toml) did not run successfully.
-    │ exit code: 1
-    ╰─> [6 lines of output]
-        
-        Cargo, the Rust package manager, is not installed or is not on PATH.
-        This package requires Rust and Cargo to compile extensions. Install it through
-        the system's package manager or via https://rustup.rs/
-        
-        Checking for Rust toolchain....
-        [end of output]
-    
-    note: This error originates from a subprocess, and is likely not a problem with pip.
-    error: metadata-generation-failed
-
-    × Encountered error while generating package metadata.
-    ╰─> See above for output.
-    note: This is an issue with the package mentioned above, not pip.
-'''
