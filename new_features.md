@@ -56,6 +56,16 @@
     - implemented analytics_routes into user_route.py
     - implemented RetentionAnalytics instance in tests/test_services/test_analytics_service.py includes fields such as conversion_rate and inactive_users_*, and fixed API Endpoint codes. 
 
-## Step 4: Include Tasks for User Invitations
+## Step 4: Enhance User Search and Filtering API
+-  Updated the user management API to allow administrators to search and filter users based on specific criteria, improving usability and accessibility of the system.
+- Allowed searching for users by nickname, email, or role.
+- Implemented comprehensive unit tests for edge cases, including:
+    - No matching records.
+    - Multiple filters applied simultaneously.
+    - Invalid or unsupported parameters.
+    - Verified query results against mocked data to ensure functionality.
 
-## Step 5: Visualize Analytics
+## Step 5:  Verify and Enhance Analytics API
+- Improved the analytics API by adding retention tracking and ensuring comprehensive test coverage for analytics-related functionality.
+- Addressed issues with mocking execute and scalars by designing hardcoded mock data for consistent and reliable test behavior. Replaced problematic coroutine mocks with predefined mock objects to ensure compatibility with FastAPI's async execution.
+- Updated new_features.md and Readme.md

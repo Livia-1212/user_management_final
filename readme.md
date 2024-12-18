@@ -7,12 +7,9 @@
 1. **Reflection Document**: 
 
     Word Document Reflection: 
-        [Document-Reflection]()
+    Document will also submit by docx on Canvas
+        [Document-Reflection](https://docs.google.com/document/d/1tJvMS3v5xDxeEv27Jyo03wQ_FeNKDg3V/edit?usp=sharing&ouid=103582853920917914547&rtpof=true&sd=true)
 
-    >>> What I have learnt:
-       how SQLAlchemy’s execute and scalars interact when mocked. When we mock these methods using AsyncMock or MagicMock, the scalars() method can behave like a coroutine if not mocked correctly, leading to confusion in the test environment.
-
-       
 
     QA-Issue & Debugging Branch:
         [5-QA-issues](https://github.com/Livia-1212/user_management_final/tree/1-Bug)
@@ -22,6 +19,8 @@
 
     New Feature Added Branch:
         [NewFeature-Branch](https://github.com/Livia-1212/user_management_final/tree/new-features)
+
+2. **What I have done for New Feature:**
 
     [New-feature-documentation] (https://github.com/Livia-1212/user_management_final/blob/new-features/new_features.md)
 
